@@ -48,9 +48,9 @@ function EndDateEditor({ assignment, patientId }: { assignment: AssignmentWithRo
       <CalendarRange className="size-3 flex-shrink-0" />
       {assignment.end_date
         ? `hasta ${new Date(assignment.end_date + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
-        : <span className="opacity-0 group-hover:opacity-100 transition-opacity">+ fecha de fin</span>
+        : <span className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">+ fecha de fin</span>
       }
-      <Pencil className="size-2.5 opacity-0 group-hover:opacity-60 transition-opacity" />
+      <Pencil className="size-2.5 opacity-60 md:opacity-0 md:group-hover:opacity-60 transition-opacity" />
     </button>
   )
 }

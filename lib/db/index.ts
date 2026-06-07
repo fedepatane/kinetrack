@@ -125,6 +125,11 @@ function initSchema(conn: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_assignments_patient ON assignments(patient_id, status);
     CREATE INDEX IF NOT EXISTS idx_patient_sessions ON patient_sessions(patient_id, session_date);
     CREATE INDEX IF NOT EXISTS idx_routine_days ON routine_days(routine_id, order_index);
+
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `)
 
   // Migraciones incrementales — seguras ante concurrencia de workers
@@ -151,9 +156,13 @@ function initSchema(conn: Database.Database) {
 
   addCol(conn, 'block_exercises', `intensity_type TEXT CHECK(intensity_type IN ('rpe','rir','1rm'))`)
   addCol(conn, 'block_exercises', `intensity_value REAL`)
+  addCol(conn, 'block_exercises', `per_side INTEGER NOT NULL DEFAULT 0`)
+  addCol(conn, 'block_exercises', `reps_max INTEGER`)
 
   addCol(conn, 'routines', `public_token TEXT`)
+  addCol(conn, 'routines', `tags TEXT NOT NULL DEFAULT '[]'`)
   addCol(conn, 'exercises', `category_id TEXT REFERENCES categories(id) ON DELETE SET NULL`)
+  addCol(conn, 'categories', `color TEXT`)
 
   // Generar public_token para rutinas que no lo tengan
   const { randomUUID } = require('crypto') as typeof import('crypto')

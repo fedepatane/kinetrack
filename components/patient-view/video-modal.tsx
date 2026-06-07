@@ -1,18 +1,21 @@
 'use client'
 
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { X, ExternalLink } from 'lucide-react'
 
 export function VideoModal({
-  embedUrl,
+  src,
+  kind = 'embed',
   title,
   children,
 }: {
-  embedUrl: string
+  src: string
+  kind?: 'embed' | 'file'
   title: string
   children: React.ReactNode
 }) {
   const [open, setOpen] = useState(false)
+  const [failed, setFailed] = useState(false)
 
   return (
     <>
@@ -34,13 +37,38 @@ export function VideoModal({
               <X className="size-5" />
             </button>
             <div className="aspect-video">
-              <iframe
-                src={`${embedUrl}?autoplay=1`}
-                title={title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="w-full h-full"
-              />
+              {kind === 'file' && failed ? (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-center px-6 bg-[var(--card)]">
+                  <p className="text-sm text-[var(--muted-foreground)]">
+                    No se pudo reproducir el video acá. El sitio que lo aloja puede estar bloqueando el acceso directo.
+                  </p>
+                  <a
+                    href={src}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-[var(--accent-teal)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity"
+                  >
+                    <ExternalLink className="size-3.5" /> Abrir en pestaña nueva
+                  </a>
+                </div>
+              ) : kind === 'file' ? (
+                <video
+                  src={src}
+                  title={title}
+                  controls
+                  autoPlay
+                  onError={() => setFailed(true)}
+                  className="w-full h-full"
+                />
+              ) : (
+                <iframe
+                  src={`${src}${src.includes('?') ? '&' : '?'}autoplay=1`}
+                  title={title}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="w-full h-full"
+                />
+              )}
             </div>
           </div>
         </div>

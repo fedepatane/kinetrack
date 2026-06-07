@@ -170,7 +170,7 @@ export function SessionsPanel({
                 </div>
                 <button
                   onClick={() => startTransition(() => deletePatientSession(s.id, patientId))}
-                  className="opacity-0 group-hover:opacity-100 p-1 text-[var(--muted-foreground)] hover:text-red-500 transition-all flex-shrink-0"
+                  className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1 text-[var(--muted-foreground)] hover:text-red-500 transition-all flex-shrink-0"
                 >
                   <X className="size-3.5" />
                 </button>

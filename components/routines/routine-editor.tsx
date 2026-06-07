@@ -6,20 +6,25 @@ import { createExerciseInline } from '@/lib/db/actions/exercises'
 import type { Exercise } from '@/lib/db/types'
 import type { RoutineWithBlocks } from '@/lib/db/queries/routines'
 import type { CategoryWithSubs } from '@/lib/db/queries/categories'
-import { Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronUp, Pencil } from 'lucide-react'
+import { TagInput } from './tag-input'
+import { resolveMedia } from '@/lib/utils'
+import { MediaLauncher } from '@/components/patient-view/media-launcher'
+import Image from 'next/image'
 
 type BEForm = {
   exercise_id: string; order_index: number
-  sets: string; reps: string; duration_seconds: string; rest_seconds: string
+  sets: string; reps: string; reps_max: string; duration_seconds: string; rest_seconds: string
   intensity_type: 'rpe' | 'rir' | '1rm' | ''; intensity_value: string
+  per_side: boolean
   notes: string
 }
 type BlockForm = { name: string; order_index: number; notes: string; exercises: BEForm[]; open: boolean }
 type DayForm   = { name: string; order_index: number; blocks: BlockForm[]; open: boolean }
 
-const emptyBE    = (i: number): BEForm    => ({ exercise_id: '', order_index: i, sets: '', reps: '', duration_seconds: '', rest_seconds: '', intensity_type: '', intensity_value: '', notes: '' })
+const emptyBE    = (i: number): BEForm    => ({ exercise_id: '', order_index: i, sets: '', reps: '', reps_max: '', duration_seconds: '', rest_seconds: '', intensity_type: '', intensity_value: '', per_side: false, notes: '' })
 const emptyBlock = (i: number): BlockForm => ({ name: '', order_index: i, notes: '', exercises: [], open: true })
-const emptyDay   = (i: number): DayForm   => ({ name: `Día ${String.fromCharCode(65 + i)}`, order_index: i, blocks: [], open: true })
+const emptyDay   = (i: number): DayForm   => ({ name: `Día ${i + 1}`, order_index: i, blocks: [], open: true })
 
 function beFromRow(be: RoutineWithBlocks['blocks'][0]['block_exercises'][0], i: number): BEForm {
   return {
@@ -27,10 +32,12 @@ function beFromRow(be: RoutineWithBlocks['blocks'][0]['block_exercises'][0], i: 
     order_index: i,
     sets: be.sets?.toString() ?? '',
     reps: be.reps?.toString() ?? '',
+    reps_max: be.reps_max?.toString() ?? '',
     duration_seconds: be.duration_seconds?.toString() ?? '',
     rest_seconds: be.rest_seconds?.toString() ?? '',
     intensity_type: be.intensity_type ?? '',
     intensity_value: be.intensity_value?.toString() ?? '',
+    per_side: be.per_side === 1,
     notes: be.notes ?? '',
   }
 }
@@ -62,8 +69,47 @@ function ExercisePicker({
   const [newDesc, setNewDesc] = useState('')
   const [newUrl, setNewUrl] = useState('')
   const [saving, setSaving] = useState(false)
+  // Si ya hay ejercicio elegido, arranca mostrando la tarjeta (no el selector)
+  const [editing, setEditing] = useState(!value)
 
   const activeCat = categories.find(c => c.id === selectedCat)
+  const selected = exercises.find(e => e.id === value) ?? null
+
+  // Vista compacta (tipo tarjeta) cuando ya hay un ejercicio elegido
+  if (!editing && selected) {
+    const media = resolveMedia(selected.video_url, selected.thumbnail_url)
+    const cat = selected as Exercise & { parent_category?: { color: string | null } | null; category?: { color: string | null } | null }
+    const color = cat.parent_category?.color ?? cat.category?.color ?? null
+    return (
+      <div className="flex-1 flex items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2"
+        style={color ? { borderLeftColor: color, borderLeftWidth: 4 } : undefined}>
+        <div className="w-20 h-12 rounded overflow-hidden bg-[var(--muted)] flex-shrink-0 relative">
+          {media ? (
+            <MediaLauncher media={media} title={selected.name}>
+              <button type="button" className="absolute inset-0 w-full h-full cursor-pointer">
+                {media.thumb && <Image src={media.thumb} alt={selected.name} width={80} height={48} className="object-cover w-full h-full" />}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/25 transition-colors">
+                  <span className="text-white/80 text-sm drop-shadow">{media.mode === 'image' ? '⤢' : '▶'}</span>
+                </div>
+              </button>
+            </MediaLauncher>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-[10px] text-[var(--muted-foreground)]">Sin video</div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{selected.name}</p>
+          {selected.description && (
+            <p className="text-xs text-[var(--muted-foreground)] truncate mt-0.5">{selected.description}</p>
+          )}
+        </div>
+        <button type="button" onClick={() => setEditing(true)}
+          className="inline-flex items-center gap-1 text-xs text-[var(--muted-foreground)] hover:text-[var(--accent-teal)] transition-colors flex-shrink-0">
+          <Pencil className="size-3" /> Cambiar
+        </button>
+      </div>
+    )
+  }
 
   const filtered = exercises.filter(ex => {
     const exCat = (ex as Exercise & { category_id?: string | null }).category_id
@@ -95,6 +141,7 @@ function ExercisePicker({
     onExerciseCreated(ex as unknown as Exercise)
     onChange(ex.id)
     setCreating(false)
+    setEditing(false)
     setNewName(''); setNewDesc(''); setNewUrl('')
     setSaving(false)
   }
@@ -126,7 +173,7 @@ function ExercisePicker({
         className="w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]"
       />
 
-      <select value={value} onChange={e => onChange(e.target.value)} required
+      <select value={value} onChange={e => { onChange(e.target.value); if (e.target.value) setEditing(false) }} required
         className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]">
         <option value="">Seleccionar ejercicio...</option>
         {filtered.map(ex => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
@@ -158,7 +205,7 @@ function ExercisePicker({
           />
           <input
             type="url"
-            placeholder="URL de YouTube (opcional)"
+            placeholder="URL del video (opcional) — YouTube, Vimeo, .mp4…"
             value={newUrl}
             onChange={e => setNewUrl(e.target.value)}
             className="w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]"
@@ -189,77 +236,144 @@ function BlockEditor({
 }) {
   return (
     <div className="rounded-lg border border-[var(--border)] bg-[var(--card)]">
-      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--border)]">
-        <input type="text" placeholder={`Bloque ${blockIdx + 1}`} value={block.name}
+      <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-[var(--border)]">
+        <span className="flex items-center justify-center size-5 rounded bg-[var(--muted)] text-[var(--muted-foreground)] text-[11px] font-semibold shrink-0">B{blockIdx + 1}</span>
+        <input type="text" placeholder={`Nombre del bloque (ej. Entrada en calor)`} value={block.name}
           onChange={e => onUpdate({ name: e.target.value })} required
-          className="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-[var(--muted-foreground)]" />
-        <button type="button" onClick={() => onUpdate({ open: !block.open })} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
+          className="flex-1 bg-transparent text-sm font-medium focus:outline-none placeholder:text-[var(--muted-foreground)] placeholder:font-normal" />
+        <button type="button" onClick={() => onUpdate({ open: !block.open })} title={block.open ? 'Contraer' : 'Expandir'} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
           {block.open ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
         </button>
-        <button type="button" onClick={onRemove} className="text-[var(--muted-foreground)] hover:text-red-500"><Trash2 className="size-4" /></button>
+        <button type="button" onClick={onRemove} title="Quitar bloque" className="text-[var(--muted-foreground)] hover:text-red-500"><Trash2 className="size-4" /></button>
       </div>
       {block.open && (
         <div className="p-3 space-y-2">
+          {block.exercises.length === 0 && (
+            <p className="text-xs text-[var(--muted-foreground)] italic px-1 py-2">Todavía no agregaste ejercicios a este bloque.</p>
+          )}
           {block.exercises.map((be, bei) => (
-            <div key={bei} className="rounded-md border border-[var(--border)] p-3 space-y-2">
-              <div className="flex gap-2 items-start">
-                <ExercisePicker
-                  value={be.exercise_id}
-                  onChange={id => onUpdateBE(bei, { exercise_id: id })}
-                  exercises={exercises}
-                  categories={categories}
-                  onExerciseCreated={onExerciseCreated}
-                />
-                <button type="button" onClick={() => onRemoveBE(bei)} className="text-[var(--muted-foreground)] hover:text-red-500 mt-1 flex-shrink-0"><Trash2 className="size-3.5" /></button>
+            <div key={bei} className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2 text-xs font-semibold text-[var(--foreground)]">
+                  <span className="flex items-center justify-center size-5 rounded-full bg-[var(--accent-teal)]/15 text-[var(--accent-teal)] text-[11px]">{bei + 1}</span>
+                  Ejercicio
+                </span>
+                <button type="button" onClick={() => onRemoveBE(bei)} title="Quitar ejercicio" className="text-[var(--muted-foreground)] hover:text-red-500 flex-shrink-0"><Trash2 className="size-3.5" /></button>
               </div>
-              <div className="grid grid-cols-4 gap-2">
-                {(['sets', 'reps', 'duration_seconds', 'rest_seconds'] as const).map((field, fi) => (
-                  <div key={field}>
-                    <label className="block text-xs text-[var(--muted-foreground)] mb-1">
-                      {['Series', 'Reps', 'Duración (s)', 'Descanso (s)'][fi]}
-                    </label>
-                    <input type="number" min="0" value={be[field]}
-                      onChange={e => onUpdateBE(bei, { [field]: e.target.value })}
+
+              <ExercisePicker
+                value={be.exercise_id}
+                onChange={id => onUpdateBE(bei, { exercise_id: id })}
+                exercises={exercises}
+                categories={categories}
+                onExerciseCreated={onExerciseCreated}
+              />
+
+              {/* Dosificación */}
+              <div className="rounded-md bg-[var(--muted)]/40 p-2.5 space-y-2.5">
+                <p className="text-[11px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">Dosificación</p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div>
+                    <label className="block text-xs text-[var(--muted-foreground)] mb-1">Series</label>
+                    <input type="number" min="0" value={be.sets} placeholder="—"
+                      onChange={e => onUpdateBE(bei, { sets: e.target.value })}
                       className="w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]" />
                   </div>
-                ))}
-              </div>
-              {/* Intensidad */}
-              <div className="flex gap-2 items-end">
-                <div>
-                  <label className="block text-xs text-[var(--muted-foreground)] mb-1">Intensidad</label>
-                  <select
-                    value={be.intensity_type}
-                    onChange={e => onUpdateBE(bei, { intensity_type: e.target.value as BEForm['intensity_type'], intensity_value: '' })}
-                    className="rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]"
-                  >
-                    <option value="">—</option>
-                    <option value="rpe">RPE (1–10)</option>
-                    <option value="rir">RIR (0–5)</option>
-                    <option value="1rm">% 1RM</option>
-                  </select>
-                </div>
-                {be.intensity_type && (
-                  <div className="flex-1 max-w-[100px]">
-                    <label className="block text-xs text-[var(--muted-foreground)] mb-1">
-                      {be.intensity_type === 'rpe' ? 'Valor (1–10)' : be.intensity_type === 'rir' ? 'Valor (0–5)' : 'Valor (%)'}
-                    </label>
-                    <input
-                      type="number"
-                      min={be.intensity_type === 'rir' ? 0 : 1}
-                      max={be.intensity_type === 'rpe' ? 10 : be.intensity_type === 'rir' ? 5 : 100}
-                      step={be.intensity_type === '1rm' ? 5 : 1}
-                      value={be.intensity_value}
-                      onChange={e => onUpdateBE(bei, { intensity_value: e.target.value })}
-                      className="w-full rounded border border-[var(--accent-teal)] bg-[var(--background)] px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]"
-                    />
+                  <div>
+                    <label className="block text-xs text-[var(--muted-foreground)] mb-1">Reps {be.reps_max && '(mín)'}</label>
+                    <div className="flex items-center gap-1">
+                      <input type="number" min="0" value={be.reps} placeholder="—"
+                        onChange={e => onUpdateBE(bei, { reps: e.target.value })}
+                        className="w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]" />
+                      <span className="text-xs text-[var(--muted-foreground)]">a</span>
+                      <input type="number" min="0" value={be.reps_max} placeholder="máx"
+                        onChange={e => onUpdateBE(bei, { reps_max: e.target.value })}
+                        title="Reps máximas (para un rango, ej. 8 a 12)"
+                        className="w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]" />
+                    </div>
                   </div>
-                )}
+                  <div>
+                    <label className="block text-xs text-[var(--muted-foreground)] mb-1">Duración (s)</label>
+                    <input type="number" min="0" value={be.duration_seconds} placeholder="—"
+                      onChange={e => onUpdateBE(bei, { duration_seconds: e.target.value })}
+                      className="w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-[var(--muted-foreground)] mb-1">Descanso (s)</label>
+                    <input type="number" min="0" value={be.rest_seconds} placeholder="—"
+                      onChange={e => onUpdateBE(bei, { rest_seconds: e.target.value })}
+                      className="w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]" />
+                  </div>
+                </div>
+
+                {/* Por lado + intensidad */}
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="flex items-center gap-1.5 text-xs text-[var(--foreground)] cursor-pointer pb-1.5 shrink-0">
+                    <input type="checkbox" checked={be.per_side}
+                      onChange={e => onUpdateBE(bei, { per_side: e.target.checked })}
+                      className="accent-[var(--accent-teal)]" />
+                    Por lado
+                  </label>
+                  <div>
+                    <label className="block text-xs text-[var(--muted-foreground)] mb-1">Intensidad</label>
+                    <select
+                      value={be.intensity_type}
+                      onChange={e => onUpdateBE(bei, { intensity_type: e.target.value as BEForm['intensity_type'], intensity_value: '' })}
+                      className="rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]"
+                    >
+                      <option value="">—</option>
+                      <option value="rpe">RPE (1–10)</option>
+                      <option value="rir">RIR (0–5)</option>
+                      <option value="1rm">% 1RM</option>
+                    </select>
+                  </div>
+                  {be.intensity_type && (
+                    <div className="w-[90px]">
+                      <label className="block text-xs text-[var(--muted-foreground)] mb-1">
+                        {be.intensity_type === 'rpe' ? 'Valor' : be.intensity_type === 'rir' ? 'Valor' : '%'}
+                      </label>
+                      {be.intensity_type === '1rm' ? (
+                        <select
+                          value={be.intensity_value}
+                          onChange={e => onUpdateBE(bei, { intensity_value: e.target.value })}
+                          className="w-full rounded border border-[var(--accent-teal)] bg-[var(--background)] px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]"
+                        >
+                          <option value="">—</option>
+                          {Array.from({ length: 11 }, (_, i) => i * 10).map(pct => (
+                            <option key={pct} value={pct}>{pct}%</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="number"
+                          min={be.intensity_type === 'rir' ? 0 : 1}
+                          max={be.intensity_type === 'rpe' ? 10 : 5}
+                          step={1}
+                          value={be.intensity_value}
+                          onChange={e => onUpdateBE(bei, { intensity_value: e.target.value })}
+                          className="w-full rounded border border-[var(--accent-teal)] bg-[var(--background)] px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]"
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Nota de dosificación */}
+                <div>
+                  <label className="block text-xs text-[var(--muted-foreground)] mb-1">Nota de dosificación</label>
+                  <input type="text" value={be.notes}
+                    onChange={e => onUpdateBE(bei, { notes: e.target.value })}
+                    placeholder="Texto libre. Si lo completás solo, es la dosificación final."
+                    title="Se muestra en la dosificación. Si no completás los otros campos, este texto es la prescripción."
+                    className="w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]" />
+                </div>
               </div>
             </div>
           ))}
-          <button type="button" onClick={onAddBE} className="inline-flex items-center gap-1 text-xs text-[var(--muted-foreground)] hover:text-[var(--accent-teal)]">
-            <Plus className="size-3" /> Agregar ejercicio
+          <button type="button" onClick={onAddBE}
+            className="w-full flex items-center justify-center gap-1.5 rounded-md border border-dashed border-[var(--border)] py-2 text-xs text-[var(--muted-foreground)] hover:border-[var(--accent-teal)] hover:text-[var(--accent-teal)] transition-colors">
+            <Plus className="size-3.5" /> Agregar ejercicio
           </button>
         </div>
       )}
@@ -270,12 +384,14 @@ function BlockEditor({
 interface Props {
   exercises: Exercise[]
   categories?: CategoryWithSubs[]
+  allTags?: string[]
   initialData?: RoutineWithBlocks
 }
 
-export function RoutineEditor({ exercises: initialExercises, categories = [], initialData }: Props) {
+export function RoutineEditor({ exercises: initialExercises, categories = [], allTags = [], initialData }: Props) {
   const isEdit = !!initialData
   const [exercises, setExercises] = useState<Exercise[]>(initialExercises)
+  const [tags, setTags] = useState<string[]>(initialData?.tags ?? [])
 
   function handleExerciseCreated(ex: Exercise) {
     setExercises(prev => [...prev, ex])
@@ -339,10 +455,12 @@ export function RoutineEditor({ exercises: initialExercises, categories = [], in
       exercise_id: be.exercise_id, order_index: bei,
       sets: be.sets ? Number(be.sets) : undefined,
       reps: be.reps ? Number(be.reps) : undefined,
+      reps_max: be.reps_max ? Number(be.reps_max) : undefined,
       duration_seconds: be.duration_seconds ? Number(be.duration_seconds) : undefined,
       rest_seconds: be.rest_seconds ? Number(be.rest_seconds) : undefined,
       intensity_type: be.intensity_type || undefined,
       intensity_value: be.intensity_value ? Number(be.intensity_value) : undefined,
+      per_side: be.per_side || undefined,
       notes: be.notes || undefined,
     })
     const mapBlock = (b: BlockForm, bi: number) => ({
@@ -353,9 +471,8 @@ export function RoutineEditor({ exercises: initialExercises, categories = [], in
     const payload = {
       name: fd.get('name'),
       description: fd.get('description') || undefined,
-      body_zone: fd.get('body_zone') || undefined,
-      difficulty: fd.get('difficulty') || undefined,
       estimated_minutes: fd.get('estimated_minutes') ? Number(fd.get('estimated_minutes')) : undefined,
+      tags,
       days: useDays ? days.map((d, di) => ({ name: d.name, order_index: di, blocks: d.blocks.map(mapBlock) })) : [],
       blocks: !useDays ? blocks.map(mapBlock) : [],
     }
@@ -370,7 +487,8 @@ export function RoutineEditor({ exercises: initialExercises, categories = [], in
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Datos básicos */}
-      <div className="space-y-4">
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4 space-y-4">
+        <h2 className="text-sm font-semibold">Datos de la rutina</h2>
         <div>
           <label className="block text-sm mb-1.5">Nombre</label>
           <input name="name" type="text" required defaultValue={initialData?.name}
@@ -381,37 +499,35 @@ export function RoutineEditor({ exercises: initialExercises, categories = [], in
           <textarea name="description" rows={2} defaultValue={initialData?.description ?? ''}
             className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)] resize-none" />
         </div>
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm mb-1.5">Zona corporal</label>
-            <input name="body_zone" type="text" defaultValue={initialData?.body_zone ?? ''}
-              className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]" />
-          </div>
-          <div>
-            <label className="block text-sm mb-1.5">Dificultad</label>
-            <select name="difficulty" defaultValue={initialData?.difficulty ?? ''}
-              className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]">
-              <option value="">—</option>
-              <option value="suave">Suave</option>
-              <option value="moderado">Moderado</option>
-              <option value="intenso">Intenso</option>
-            </select>
-          </div>
+        <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm mb-1.5">Duración (min)</label>
             <input name="estimated_minutes" type="number" min="1" defaultValue={initialData?.estimated_minutes ?? ''}
               className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]" />
           </div>
         </div>
+        <div>
+          <label className="block text-sm mb-1.5">Tags</label>
+          <TagInput value={tags} onChange={setTags} suggestions={allTags} />
+          <p className="text-xs text-[var(--muted-foreground)] mt-1">Escribí y elegí un tag existente o creá uno nuevo. Sirven para organizar y buscar rutinas.</p>
+        </div>
       </div>
 
-      {/* Toggle días */}
-      <div className="flex items-center gap-3">
-        <button type="button" onClick={() => setUseDays(v => !v)}
-          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${useDays ? 'bg-[var(--accent-teal)]' : 'bg-[var(--muted)]'}`}>
-          <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${useDays ? 'translate-x-4' : 'translate-x-1'}`} />
-        </button>
-        <span className="text-sm text-[var(--muted-foreground)]">Rutina con varios días (Día A, Día B...)</span>
+      {/* Estructura */}
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
+        <div>
+          <h2 className="text-sm font-semibold">Estructura</h2>
+          <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+            {useDays ? 'La rutina se divide en días (Día 1, Día 2…), cada uno con sus bloques.' : 'La rutina es un solo plan organizado en bloques.'}
+          </p>
+        </div>
+        <label className="flex items-center gap-2 cursor-pointer shrink-0">
+          <span className="text-xs text-[var(--muted-foreground)]">Varios días</span>
+          <button type="button" onClick={() => setUseDays(v => !v)}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${useDays ? 'bg-[var(--accent-teal)]' : 'bg-[var(--muted)]'}`}>
+            <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${useDays ? 'translate-x-4' : 'translate-x-1'}`} />
+          </button>
+        </label>
       </div>
 
       {/* Editor con días */}
@@ -419,16 +535,21 @@ export function RoutineEditor({ exercises: initialExercises, categories = [], in
         <div className="space-y-4">
           {days.map((day, di) => (
             <div key={di} className="rounded-lg border-2 border-[var(--border)] overflow-hidden">
-              <div className="flex items-center gap-3 px-4 py-3 bg-[var(--muted)] border-b border-[var(--border)]">
+              <div className="flex items-center gap-2.5 px-4 py-3 bg-[var(--muted)] border-b border-[var(--border)]">
+                <span className="flex items-center justify-center size-6 rounded-full bg-[var(--accent-teal)] text-white text-xs font-semibold shrink-0">{di + 1}</span>
                 <input value={day.name} onChange={e => updDay(di, { name: e.target.value })} required
-                  className="flex-1 bg-transparent text-sm font-medium focus:outline-none" />
-                <button type="button" onClick={() => updDay(di, { open: !day.open })} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
+                  placeholder={`Día ${di + 1}`}
+                  className="flex-1 bg-transparent text-sm font-semibold focus:outline-none placeholder:text-[var(--muted-foreground)] placeholder:font-normal" />
+                <button type="button" onClick={() => updDay(di, { open: !day.open })} title={day.open ? 'Contraer' : 'Expandir'} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
                   {day.open ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
                 </button>
-                <button type="button" onClick={() => removeDay(di)} className="text-[var(--muted-foreground)] hover:text-red-500"><Trash2 className="size-4" /></button>
+                <button type="button" onClick={() => removeDay(di)} title="Quitar día" className="text-[var(--muted-foreground)] hover:text-red-500"><Trash2 className="size-4" /></button>
               </div>
               {day.open && (
                 <div className="p-4 space-y-3">
+                  {day.blocks.length === 0 && (
+                    <p className="text-xs text-[var(--muted-foreground)] italic">Agregá un bloque para empezar a cargar ejercicios.</p>
+                  )}
                   {day.blocks.map((block, bi) => (
                     <BlockEditor key={bi} block={block} blockIdx={bi} exercises={exercises} categories={categories}
                       onUpdate={p => updBlockInDay(di, bi, p)}
@@ -440,7 +561,7 @@ export function RoutineEditor({ exercises: initialExercises, categories = [], in
                     />
                   ))}
                   <button type="button" onClick={() => addBlockToDay(di)}
-                    className="inline-flex items-center gap-1 text-xs text-[var(--muted-foreground)] hover:text-[var(--accent-teal)]">
+                    className="w-full flex items-center justify-center gap-1.5 rounded-md border border-dashed border-[var(--border)] py-2 text-xs text-[var(--muted-foreground)] hover:border-[var(--accent-teal)] hover:text-[var(--accent-teal)] transition-colors">
                     <Plus className="size-3.5" /> Agregar bloque
                   </button>
                 </div>
@@ -448,12 +569,15 @@ export function RoutineEditor({ exercises: initialExercises, categories = [], in
             </div>
           ))}
           <button type="button" onClick={addDay}
-            className="inline-flex items-center gap-1.5 text-sm text-[var(--muted-foreground)] hover:text-[var(--accent-teal)] transition-colors">
+            className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-[var(--border)] py-3 text-sm font-medium text-[var(--muted-foreground)] hover:border-[var(--accent-teal)] hover:text-[var(--accent-teal)] transition-colors">
             <Plus className="size-4" /> Agregar día
           </button>
         </div>
       ) : (
         <div className="space-y-3">
+          {blocks.length === 0 && (
+            <p className="text-xs text-[var(--muted-foreground)] italic">Agregá un bloque para empezar a cargar ejercicios.</p>
+          )}
           {blocks.map((block, bi) => (
             <BlockEditor key={bi} block={block} blockIdx={bi} exercises={exercises} categories={categories}
               onUpdate={p => updBlock(bi, p)}
@@ -465,7 +589,7 @@ export function RoutineEditor({ exercises: initialExercises, categories = [], in
             />
           ))}
           <button type="button" onClick={() => setBlocks(bs => [...bs, emptyBlock(bs.length)])}
-            className="inline-flex items-center gap-1.5 text-sm text-[var(--muted-foreground)] hover:text-[var(--accent-teal)]">
+            className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-[var(--border)] py-3 text-sm font-medium text-[var(--muted-foreground)] hover:border-[var(--accent-teal)] hover:text-[var(--accent-teal)] transition-colors">
             <Plus className="size-4" /> Agregar bloque
           </button>
         </div>
@@ -473,10 +597,12 @@ export function RoutineEditor({ exercises: initialExercises, categories = [], in
 
       {error && <p className="text-sm text-red-500">{error}</p>}
 
-      <button type="submit" disabled={pending}
-        className="rounded-md bg-[var(--accent-teal)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 transition-opacity">
-        {pending ? 'Guardando...' : isEdit ? 'Guardar cambios' : 'Crear rutina'}
-      </button>
+      <div className="flex justify-end border-t border-[var(--border)] pt-4">
+        <button type="submit" disabled={pending}
+          className="rounded-md bg-[var(--accent-teal)] px-6 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 transition-opacity">
+          {pending ? 'Guardando...' : isEdit ? 'Guardar cambios' : 'Crear rutina'}
+        </button>
+      </div>
     </form>
   )
 }

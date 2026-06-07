@@ -1,10 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Copy, Check } from 'lucide-react'
 
-export function PublicLinkCopy({ url }: { url: string }) {
+// Recibe una ruta relativa (ej. /p/token) y arma el link con el dominio actual
+// del navegador, así el link copiado funciona sea cual sea el dominio.
+export function PublicLinkCopy({ path }: { path: string }) {
   const [copied, setCopied] = useState(false)
+  const [origin, setOrigin] = useState('')
+
+  useEffect(() => { setOrigin(window.location.origin) }, [])
+
+  const url = `${origin}${path}`
 
   async function copy() {
     await navigator.clipboard.writeText(url)
@@ -20,7 +27,7 @@ export function PublicLinkCopy({ url }: { url: string }) {
         className="flex items-center gap-1 text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors flex-shrink-0"
       >
         {copied ? <Check className="size-3.5 text-[var(--accent-teal)]" /> : <Copy className="size-3.5" />}
-        {copied ? 'Copiado' : 'Copiar'}
+        {copied ? 'Copiado' : 'Copiar link'}
       </button>
     </div>
   )

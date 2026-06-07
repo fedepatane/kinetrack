@@ -40,16 +40,19 @@ export default async function EditExercisePage({ params }: { params: Promise<{ i
         )}
 
         <div>
-          <label htmlFor="video_url" className="block text-sm mb-1.5">URL de YouTube</label>
+          <label htmlFor="video_url" className="block text-sm mb-1.5">URL del video</label>
           <input id="video_url" name="video_url" type="url" defaultValue={exercise.video_url ?? ''}
-            placeholder="https://youtube.com/watch?v=..."
+            placeholder="YouTube, Vimeo, Drive, .mp4… cualquier link público"
             className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]" />
+          <p className="text-xs text-[var(--muted-foreground)] mt-1">YouTube, Vimeo, Google Drive, Loom y archivos (.mp4/.webm) se ven dentro de la app. Otros links se abren en una pestaña nueva.</p>
         </div>
 
         <div>
-          <label htmlFor="tags" className="block text-sm mb-1.5">Tags (separados por coma)</label>
-          <input id="tags" name="tags" type="text" defaultValue={exercise.tags.join(', ')}
+          <label htmlFor="thumbnail_url" className="block text-sm mb-1.5">Miniatura (opcional)</label>
+          <input id="thumbnail_url" name="thumbnail_url" type="url" defaultValue={exercise.thumbnail_url ?? ''}
+            placeholder="URL de una imagen para la miniatura"
             className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]" />
+          <p className="text-xs text-[var(--muted-foreground)] mt-1">Si lo dejás vacío, se intenta tomar la imagen de la página del video automáticamente.</p>
         </div>
 
         <div className="flex gap-3 pt-2">

@@ -72,6 +72,7 @@ export function getPatientWithAssignments(id: string): PatientWithAssignments | 
         body_zone: row.r_body_zone as string | null,
         difficulty: row.r_difficulty as Routine['difficulty'],
         estimated_minutes: row.r_estimated_minutes as number | null,
+        tags: [],
         description: null,
         public_token: row.r_public_token as string | null,
         created_at: '',

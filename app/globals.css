@@ -21,21 +21,20 @@
   --sidebar-border: #e5e5e5;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --card: #141414;
-    --card-foreground: #ededed;
-    --border: #262626;
-    --input: #262626;
-    --muted: #1a1a1a;
-    --muted-foreground: #a3a3a3;
-    --accent-teal-light: #0d3326;
-    --accent-amber-light: #2a1f00;
-    --sidebar-bg: #0f0f0f;
-    --sidebar-border: #1a1a1a;
-  }
+/* Modo oscuro: se activa con la clase .dark en <html> (la pone el script de tema) */
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --card: #141414;
+  --card-foreground: #ededed;
+  --border: #262626;
+  --input: #262626;
+  --muted: #1a1a1a;
+  --muted-foreground: #a3a3a3;
+  --accent-teal-light: #0d3326;
+  --accent-amber-light: #2a1f00;
+  --sidebar-bg: #0f0f0f;
+  --sidebar-border: #1a1a1a;
 }
 
 @theme inline {

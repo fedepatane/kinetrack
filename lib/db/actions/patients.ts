@@ -47,6 +47,34 @@ export async function createPatient(formData: FormData) {
   redirect(`/pacientes/${id}`)
 }
 
+export async function updatePatient(id: string, formData: FormData) {
+  await requireAuth()
+
+  const parsed = schema.safeParse({
+    first_name: formData.get('first_name'),
+    last_name: formData.get('last_name'),
+    birth_date: formData.get('birth_date') || undefined,
+    consultation_reason: formData.get('consultation_reason') || undefined,
+    notes: formData.get('notes') || undefined,
+  })
+  if (!parsed.success) return
+
+  db.prepare(`
+    UPDATE patients SET
+      first_name = ?, last_name = ?, birth_date = ?, consultation_reason = ?
+    WHERE id = ?
+  `).run(
+    parsed.data.first_name,
+    parsed.data.last_name,
+    parsed.data.birth_date ?? null,
+    parsed.data.consultation_reason ?? null,
+    id,
+  )
+
+  revalidatePath(`/pacientes/${id}`)
+  revalidatePath('/pacientes')
+}
+
 export async function updatePatientPlan(id: string, data: {
   rehab_phase_current: string | null
   rehab_phase_next: string | null

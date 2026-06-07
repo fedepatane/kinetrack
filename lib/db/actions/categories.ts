@@ -17,9 +17,29 @@ export async function createCategory(name: string, parentId: string | null = nul
   revalidatePath('/ejercicios')
 }
 
+export async function setCategoryColor(id: string, color: string | null) {
+  await requireAuth()
+  db.prepare(`UPDATE categories SET color = ? WHERE id = ?`).run(color, id)
+  revalidatePath('/categorias')
+  revalidatePath('/ejercicios')
+  revalidatePath('/rutinas')
+}
+
 export async function renameCategory(id: string, name: string) {
   await requireAuth()
   db.prepare(`UPDATE categories SET name = ? WHERE id = ?`).run(name.trim(), id)
+  revalidatePath('/categorias')
+  revalidatePath('/ejercicios')
+}
+
+// Persiste un nuevo orden para un conjunto de categorías hermanas (mismo padre).
+// Asigna order_index según la posición en el array recibido.
+export async function reorderCategories(orderedIds: string[]) {
+  await requireAuth()
+  if (orderedIds.length === 0) return
+  const upd = db.prepare(`UPDATE categories SET order_index = ? WHERE id = ?`)
+  const reorder = db.transaction(() => orderedIds.forEach((id, i) => upd.run(i, id)))
+  reorder()
   revalidatePath('/categorias')
   revalidatePath('/ejercicios')
 }

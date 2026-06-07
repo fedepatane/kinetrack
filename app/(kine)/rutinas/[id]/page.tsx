@@ -1,20 +1,14 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getRoutineWithBlocks } from '@/lib/db/queries/routines'
-import { ArrowLeft, Clock, Pencil } from 'lucide-react'
+import { ArrowLeft, Clock, Pencil, ExternalLink } from 'lucide-react'
 import { DeleteButton } from '@/components/ui/delete-button'
 import { deleteRoutine } from '@/lib/db/actions/routines'
 import { DuplicateRoutineButton } from '@/components/routines/duplicate-button'
-import { formatDose, getYoutubeThumbnail, getYoutubeEmbedUrl } from '@/lib/utils'
-import { VideoModal } from '@/components/patient-view/video-modal'
+import { formatDose, resolveMedia } from '@/lib/utils'
+import { MediaLauncher } from '@/components/patient-view/media-launcher'
 import { PublicLinkCopy } from '@/components/patients/public-link-copy'
 import Image from 'next/image'
-
-const difficultyColors: Record<string, string> = {
-  suave: 'text-[var(--accent-teal)] bg-[var(--accent-teal-light)]',
-  moderado: 'text-[var(--accent-amber)] bg-[var(--accent-amber-light)]',
-  intenso: 'text-red-600 bg-red-50',
-}
 
 import type { BlockWithExercises } from '@/lib/db/queries/routines'
 
@@ -30,20 +24,22 @@ function BlockList({ blocks }: { blocks: BlockWithExercises[] }) {
             <div className="space-y-2">
               {sortedBEs.map(be => {
                 const ex = be.exercise
-                const thumb = ex?.video_url ? getYoutubeThumbnail(ex.video_url) : null
-                const embedUrl = ex?.video_url ? getYoutubeEmbedUrl(ex.video_url) : null
+                const media = resolveMedia(ex?.video_url, ex?.thumbnail_url)
+                const thumb = media?.thumb ?? null
+                const color = ex?.category_color
                 return (
-                  <div key={be.id} className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2.5">
+                  <div key={be.id} className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2.5"
+                    style={color ? { borderLeftColor: color, borderLeftWidth: 4 } : undefined}>
                     <div className="w-16 h-10 rounded bg-[var(--muted)] flex-shrink-0 overflow-hidden relative">
-                      {embedUrl ? (
-                        <VideoModal embedUrl={embedUrl} title={ex?.name ?? ''}>
+                      {media ? (
+                        <MediaLauncher media={media} title={ex?.name ?? ''}>
                           <button className="absolute inset-0 w-full h-full cursor-pointer">
                             {thumb && <Image src={thumb} alt={ex?.name ?? ''} width={64} height={40} className="object-cover w-full h-full" />}
                             <div className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/25 transition-colors">
-                              <span className="text-white/80 text-xs drop-shadow">▶</span>
+                              <span className="text-white/80 text-xs drop-shadow">{media.mode === 'image' ? '⤢' : '▶'}</span>
                             </div>
                           </button>
-                        </VideoModal>
+                        </MediaLauncher>
                       ) : thumb ? (
                         <Image src={thumb} alt={ex?.name ?? ''} width={64} height={40} className="object-cover w-full h-full" />
                       ) : (
@@ -96,20 +92,29 @@ export default async function RoutineDetailPage({ params }: { params: Promise<{ 
 
       {routine.public_token && (
         <div className="mb-6">
-          <p className="text-xs text-[var(--muted-foreground)] mb-2">Link para compartir</p>
-          <PublicLinkCopy url={`${process.env.NEXT_PUBLIC_APP_URL}/r/${routine.public_token}`} />
+          <div className="flex items-center justify-between mb-2 gap-2">
+            <p className="text-xs text-[var(--muted-foreground)]">Link para compartir</p>
+            <a
+              href={`/r/${routine.public_token}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--accent-teal)] hover:opacity-80 transition-opacity flex-shrink-0"
+            >
+              <ExternalLink className="size-3.5" /> Ver como el paciente
+            </a>
+          </div>
+          <PublicLinkCopy path={`/r/${routine.public_token}`} />
         </div>
       )}
 
       <div className="mb-8">
-        <div className="flex items-start gap-3 mb-2">
+        <div className="flex items-start gap-3 mb-2 flex-wrap">
           <h1 className="text-lg font-medium flex-1">{routine.name}</h1>
-          {routine.difficulty && (
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${difficultyColors[routine.difficulty]}`}>{routine.difficulty}</span>
-          )}
+          {routine.tags.map(tag => (
+            <span key={tag} className="text-xs px-2 py-0.5 rounded-full font-medium bg-[var(--accent-teal)]/15 text-[var(--accent-teal)]">{tag}</span>
+          ))}
         </div>
         <div className="flex gap-4 text-sm text-[var(--muted-foreground)]">
-          {routine.body_zone && <span>{routine.body_zone}</span>}
           {routine.estimated_minutes && (
             <span className="flex items-center gap-1"><Clock className="size-3.5" />{routine.estimated_minutes} min</span>
           )}

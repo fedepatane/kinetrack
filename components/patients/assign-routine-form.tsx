@@ -12,6 +12,23 @@ export function AssignRoutineForm({
   routines: Routine[]
 }) {
   const [pending, setPending] = useState(false)
+  const [activeTag, setActiveTag] = useState('')
+  const [routineId, setRoutineId] = useState('')
+
+  // Tags únicos de todas las rutinas, ordenados
+  const allTags = [...new Set(routines.flatMap(r => r.tags))].sort((a, b) =>
+    a.localeCompare(b, 'es', { sensitivity: 'base' }))
+
+  const filtered = activeTag ? routines.filter(r => r.tags.includes(activeTag)) : routines
+
+  function toggleTag(tag: string) {
+    const next = activeTag === tag ? '' : tag
+    setActiveTag(next)
+    // Si la rutina elegida ya no entra en el filtro, la deselecciono
+    if (routineId && !(next ? routines.find(r => r.id === routineId)?.tags.includes(next) : true)) {
+      setRoutineId('')
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -29,16 +46,36 @@ export function AssignRoutineForm({
 
       <div>
         <label htmlFor="routine_id" className="block text-sm mb-1.5">Rutina</label>
+        {allTags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {allTags.map(tag => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => toggleTag(tag)}
+                className={`text-xs px-2 py-0.5 rounded-full font-medium transition-colors ${
+                  activeTag === tag
+                    ? 'bg-[var(--accent-teal)] text-white'
+                    : 'bg-[var(--accent-teal)]/15 text-[var(--accent-teal)] hover:bg-[var(--accent-teal)]/25'
+                }`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        )}
         <select
           id="routine_id"
           name="routine_id"
           required
+          value={routineId}
+          onChange={e => setRoutineId(e.target.value)}
           className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-teal)]"
         >
           <option value="">Seleccionar rutina...</option>
-          {routines.map(r => (
+          {filtered.map(r => (
             <option key={r.id} value={r.id}>
-              {r.name}{r.body_zone ? ` — ${r.body_zone}` : ''}
+              {r.name}{r.tags.length ? ` — ${r.tags.join(', ')}` : ''}
             </option>
           ))}
         </select>

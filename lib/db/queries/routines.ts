@@ -1,28 +1,54 @@
 import { db } from '@/lib/db'
 import type { Routine, Block, BlockExercise, Exercise, RoutineDay } from '@/lib/db/types'
 
-export function getRoutines(opts?: { q?: string; difficulty?: string; bodyZone?: string }): Routine[] {
+function parseRoutineRow(row: Record<string, unknown>): Routine {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    description: row.description as string | null,
+    body_zone: row.body_zone as string | null,
+    difficulty: row.difficulty as Routine['difficulty'],
+    estimated_minutes: row.estimated_minutes as number | null,
+    tags: JSON.parse((row.tags as string) || '[]'),
+    public_token: row.public_token as string | null,
+    created_at: row.created_at as string,
+  }
+}
+
+export function getRoutines(opts?: { q?: string; tag?: string }): Routine[] {
   const conditions: string[] = []
   const args: unknown[] = []
 
   if (opts?.q) {
-    conditions.push(`(name LIKE ? OR description LIKE ? OR body_zone LIKE ?)`)
-    args.push(`%${opts.q}%`, `%${opts.q}%`, `%${opts.q}%`)
+    conditions.push(`(name LIKE ? OR description LIKE ?)`)
+    args.push(`%${opts.q}%`, `%${opts.q}%`)
   }
-  if (opts?.difficulty) {
-    conditions.push(`difficulty = ?`)
-    args.push(opts.difficulty)
-  }
-  if (opts?.bodyZone) {
-    conditions.push(`body_zone LIKE ?`)
-    args.push(`%${opts.bodyZone}%`)
-  }
+  // El tag se filtra en JS (los tags se guardan como JSON array)
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
-  return db.prepare(`SELECT * FROM routines ${where} ORDER BY name`).all(...args) as Routine[]
+  const rows = db.prepare(`SELECT * FROM routines ${where} ORDER BY name COLLATE NOCASE`).all(...args) as Record<string, unknown>[]
+  let routines = rows.map(parseRoutineRow)
+  if (opts?.tag) routines = routines.filter(r => r.tags.includes(opts.tag!))
+  return routines
 }
 
-export type BlockExerciseWithExercise = BlockExercise & { exercise: Exercise | null }
+// Todos los tags usados en rutinas, únicos y ordenados alfabéticamente.
+export function getRoutineTags(): string[] {
+  const rows = db.prepare(`SELECT tags FROM routines`).all() as { tags: string }[]
+  const set = new Set<string>()
+  for (const r of rows) {
+    try {
+      for (const t of JSON.parse(r.tags || '[]') as string[]) {
+        if (t.trim()) set.add(t.trim())
+      }
+    } catch { /* ignorar JSON inválido */ }
+  }
+  return [...set].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }))
+}
+
+export type BlockExerciseWithExercise = BlockExercise & {
+  exercise: (Exercise & { category_color: string | null }) | null
+}
 export type BlockWithExercises = Block & { block_exercises: BlockExerciseWithExercise[] }
 export type DayWithBlocks = RoutineDay & { blocks: BlockWithExercises[] }
 export type RoutineWithBlocks = Routine & {
@@ -39,9 +65,12 @@ function fetchBlocksForParent(parentId: string, field: 'day_id' | 'routine_id_no
     const rows = db.prepare(`
       SELECT be.*, e.name as e_name, e.description as e_desc,
              e.video_type as e_vtype, e.video_url as e_vurl,
-             e.thumbnail_url as e_thumb, e.duration_seconds as e_dur, e.tags as e_tags
+             e.thumbnail_url as e_thumb, e.duration_seconds as e_dur, e.tags as e_tags,
+             COALESCE(ep.color, ec.color) as e_cat_color
       FROM block_exercises be
       LEFT JOIN exercises e ON e.id = be.exercise_id
+      LEFT JOIN categories ec ON ec.id = e.category_id
+      LEFT JOIN categories ep ON ep.id = ec.parent_id
       WHERE be.block_id = ?
       ORDER BY be.order_index
     `).all(block.id) as Record<string, unknown>[]
@@ -59,6 +88,8 @@ function fetchBlocksForParent(parentId: string, field: 'day_id' | 'routine_id_no
         rest_seconds: r.rest_seconds as number | null,
         intensity_type: (r.intensity_type as 'rpe' | 'rir' | '1rm' | null) ?? null,
         intensity_value: r.intensity_value as number | null,
+        per_side: (r.per_side ? 1 : 0) as 0 | 1,
+        reps_max: r.reps_max as number | null,
         notes: r.notes as string | null,
         exercise: r.e_name ? {
           id: r.exercise_id as string,
@@ -71,6 +102,7 @@ function fetchBlocksForParent(parentId: string, field: 'day_id' | 'routine_id_no
           tags: JSON.parse((r.e_tags as string) || '[]'),
           created_at: '',
           category_id: null,
+          category_color: r.e_cat_color as string | null,
         } : null,
       })),
     }
@@ -78,8 +110,9 @@ function fetchBlocksForParent(parentId: string, field: 'day_id' | 'routine_id_no
 }
 
 export function getRoutineWithBlocks(id: string): RoutineWithBlocks | null {
-  const routine = db.prepare(`SELECT * FROM routines WHERE id = ?`).get(id) as Routine | null
-  if (!routine) return null
+  const row = db.prepare(`SELECT * FROM routines WHERE id = ?`).get(id) as Record<string, unknown> | undefined
+  if (!row) return null
+  const routine = parseRoutineRow(row)
 
   const dayRows = db.prepare(
     `SELECT * FROM routine_days WHERE routine_id = ? ORDER BY order_index`

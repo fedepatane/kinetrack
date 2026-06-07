@@ -18,6 +18,15 @@ export default async function EjerciciosPage({
     getCategories(),
   ]
 
+  // Orden de las categorías igual al de su solapa (order_index): primero cada
+  // categoría padre y, debajo, sus subcategorías.
+  const categoryRank = new Map<string, number>()
+  let rank = 0
+  for (const top of categories) {
+    categoryRank.set(top.id, rank++)
+    for (const sub of top.subcategories) categoryRank.set(sub.id, rank++)
+  }
+
   // Agrupar por categoría
   type Group = { label: string; sublabel?: string; items: typeof exercises }
   const groupMap = new Map<string, Group>()
@@ -29,7 +38,12 @@ export default async function EjerciciosPage({
     if (!groupMap.has(key)) groupMap.set(key, { label, sublabel, items: [] })
     groupMap.get(key)!.items.push(ex)
   }
-  const groups = [...groupMap.entries()].sort(([a], [b]) => a === '__none__' ? 1 : b === '__none__' ? -1 : 0)
+  // Ordenar los grupos según el orden de las categorías; "Sin categoría" al final.
+  const groups = [...groupMap.entries()].sort(([a], [b]) => {
+    if (a === '__none__') return 1
+    if (b === '__none__') return -1
+    return (categoryRank.get(a) ?? Infinity) - (categoryRank.get(b) ?? Infinity)
+  })
 
   return (
     <div className="max-w-3xl">

@@ -24,20 +24,22 @@ function parseExercise(row: Record<string, unknown>): ExerciseWithCategory {
       name: row.cat_name as string,
       parent_id: row.cat_parent as string | null,
       order_index: row.cat_order as number,
+      color: row.cat_color as string | null,
     } : null,
     parent_category: row.pcat_id ? {
       id: row.pcat_id as string,
       name: row.pcat_name as string,
       parent_id: null,
       order_index: row.pcat_order as number,
+      color: row.pcat_color as string | null,
     } : null,
   }
 }
 
 const SELECT = `
   SELECT e.*,
-    c.id as cat_id, c.name as cat_name, c.parent_id as cat_parent, c.order_index as cat_order,
-    p.id as pcat_id, p.name as pcat_name, p.order_index as pcat_order
+    c.id as cat_id, c.name as cat_name, c.parent_id as cat_parent, c.order_index as cat_order, c.color as cat_color,
+    p.id as pcat_id, p.name as pcat_name, p.order_index as pcat_order, p.color as pcat_color
   FROM exercises e
   LEFT JOIN categories c ON c.id = e.category_id
   LEFT JOIN categories p ON p.id = c.parent_id
@@ -62,7 +64,7 @@ export function getExercises(opts?: { q?: string; cat?: string; sub?: string }):
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
-  const rows = db.prepare(`${SELECT} ${where} ORDER BY e.name`).all(...args) as Record<string, unknown>[]
+  const rows = db.prepare(`${SELECT} ${where} ORDER BY e.name COLLATE NOCASE`).all(...args) as Record<string, unknown>[]
   return rows.map(parseExercise)
 }
 

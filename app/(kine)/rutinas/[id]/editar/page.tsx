@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { getRoutineWithBlocks } from '@/lib/db/queries/routines'
+import { getRoutineWithBlocks, getRoutineTags } from '@/lib/db/queries/routines'
 import { getExercises } from '@/lib/db/queries/exercises'
 import { getCategories } from '@/lib/db/queries/categories'
 import { RoutineEditor } from '@/components/routines/routine-editor'
@@ -13,6 +13,7 @@ export default async function EditRoutinePage({ params }: { params: Promise<{ id
 
   const exercises = getExercises()
   const categories = getCategories()
+  const allTags = getRoutineTags()
 
   return (
     <div className="max-w-2xl">
@@ -25,7 +26,7 @@ export default async function EditRoutinePage({ params }: { params: Promise<{ id
 
       <h1 className="text-lg font-medium mb-6">Editar rutina</h1>
 
-      <RoutineEditor exercises={exercises} categories={categories} initialData={routine} />
+      <RoutineEditor exercises={exercises} categories={categories} allTags={allTags} initialData={routine} />
     </div>
   )
 }

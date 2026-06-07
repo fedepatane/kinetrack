@@ -2,13 +2,13 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getPatientWithAssignments } from '@/lib/db/queries/patients'
 import { getRoutines } from '@/lib/db/queries/routines'
-import { PatientAvatar } from '@/components/patients/patient-avatar'
+import { PatientDetailsEditor } from '@/components/patients/patient-details-editor'
 import { AssignmentList } from '@/components/patients/assignment-list'
 import { AssignRoutineForm } from '@/components/patients/assign-routine-form'
 import { PublicLinkCopy } from '@/components/patients/public-link-copy'
 import { PatientPlanEditor } from '@/components/patients/patient-plan-editor'
 import { SessionsPanel } from '@/components/patients/sessions-panel'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ExternalLink } from 'lucide-react'
 import { DeleteButton } from '@/components/ui/delete-button'
 import { deletePatient } from '@/lib/db/actions/patients'
 import { PrivateNotes } from '@/components/patients/private-notes'
@@ -21,12 +21,6 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
     getRoutines(),
   ])
   if (!patient) notFound()
-
-  const age = patient.birth_date
-    ? Math.floor((Date.now() - new Date(patient.birth_date).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
-    : null
-
-  const publicUrl = `${process.env.NEXT_PUBLIC_APP_URL}/p/${patient.public_token}`
 
   return (
     <div className="max-w-2xl space-y-8">
@@ -45,21 +39,14 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
       </div>
 
       {/* Header */}
-      <div className="flex items-start gap-4">
-        <PatientAvatar firstName={patient.first_name} lastName={patient.last_name} size="lg" />
-        <div className="flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-lg font-medium">{patient.first_name} {patient.last_name}</h1>
-            {!patient.is_active && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--muted)] text-[var(--muted-foreground)] font-medium">inactivo</span>
-            )}
-          </div>
-          <div className="mt-1 text-sm text-[var(--muted-foreground)] space-y-0.5">
-            {age !== null && <p>{age} años</p>}
-            {patient.consultation_reason && <p>{patient.consultation_reason}</p>}
-          </div>
-        </div>
-      </div>
+      <PatientDetailsEditor
+        id={patient.id}
+        firstName={patient.first_name}
+        lastName={patient.last_name}
+        birthDate={patient.birth_date}
+        consultationReason={patient.consultation_reason}
+        isActive={patient.is_active}
+      />
 
       {/* Notas privadas */}
       <section>
@@ -68,8 +55,18 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
 
       {/* Link público */}
       <section>
-        <h2 className="text-sm font-medium mb-2">Link del paciente</h2>
-        <PublicLinkCopy url={publicUrl} />
+        <div className="flex items-center justify-between mb-2 gap-2">
+          <h2 className="text-sm font-medium">Link del paciente</h2>
+          <a
+            href={`/p/${patient.public_token}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--accent-teal)] hover:opacity-80 transition-opacity flex-shrink-0"
+          >
+            <ExternalLink className="size-3.5" /> Ver como el paciente
+          </a>
+        </div>
+        <PublicLinkCopy path={`/p/${patient.public_token}`} />
       </section>
 
       {/* Plan e indicaciones */}

@@ -16,6 +16,8 @@ const blockExerciseSchema = z.object({
   rest_seconds: z.coerce.number().optional(),
   intensity_type: z.enum(['rpe', 'rir', '1rm']).optional(),
   intensity_value: z.coerce.number().optional(),
+  per_side: z.coerce.boolean().optional(),
+  reps_max: z.coerce.number().optional(),
   notes: z.string().optional(),
 })
 
@@ -35,9 +37,8 @@ const daySchema = z.object({
 const routineSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
-  body_zone: z.string().optional(),
-  difficulty: z.enum(['suave', 'moderado', 'intenso']).optional(),
   estimated_minutes: z.coerce.number().optional(),
+  tags: z.array(z.string()).default([]),
   days: z.array(daySchema).default([]),    // días con sus bloques
   blocks: z.array(blockSchema).default([]), // bloques sin día (rutina simple)
 })
@@ -52,12 +53,13 @@ function insertBlocks(blocks: z.infer<typeof blockSchema>[], routineId: string, 
 
     for (const be of block.exercises) {
       db.prepare(`
-        INSERT INTO block_exercises (id, block_id, exercise_id, order_index, sets, reps, duration_seconds, rest_seconds, intensity_type, intensity_value, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO block_exercises (id, block_id, exercise_id, order_index, sets, reps, duration_seconds, rest_seconds, intensity_type, intensity_value, per_side, reps_max, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         randomUUID(), blockId, be.exercise_id, be.order_index,
         be.sets ?? null, be.reps ?? null, be.duration_seconds ?? null,
         be.rest_seconds ?? null, be.intensity_type ?? null, be.intensity_value ?? null,
+        be.per_side ? 1 : 0, be.reps_max ?? null,
         be.notes ?? null,
       )
     }
@@ -74,12 +76,12 @@ export async function createRoutine(payload: unknown): Promise<{ error?: string 
 
   const insert = db.transaction(() => {
     db.prepare(`
-      INSERT INTO routines (id, name, description, body_zone, difficulty, estimated_minutes, public_token)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO routines (id, name, description, estimated_minutes, tags, public_token)
+      VALUES (?, ?, ?, ?, ?, ?)
     `).run(
       routineId, routineData.name, routineData.description ?? null,
-      routineData.body_zone ?? null, routineData.difficulty ?? null,
-      routineData.estimated_minutes ?? null, randomUUID().replace(/-/g, ''),
+      routineData.estimated_minutes ?? null, JSON.stringify(routineData.tags ?? []),
+      randomUUID().replace(/-/g, ''),
     )
 
     // Días
@@ -108,12 +110,11 @@ export async function updateRoutine(id: string, payload: unknown): Promise<{ err
 
   const update = db.transaction(() => {
     db.prepare(`
-      UPDATE routines SET name=?, description=?, body_zone=?, difficulty=?, estimated_minutes=?
+      UPDATE routines SET name=?, description=?, estimated_minutes=?, tags=?
       WHERE id=?
     `).run(
       routineData.name, routineData.description ?? null,
-      routineData.body_zone ?? null, routineData.difficulty ?? null,
-      routineData.estimated_minutes ?? null, id,
+      routineData.estimated_minutes ?? null, JSON.stringify(routineData.tags ?? []), id,
     )
 
     // Borrar días y bloques anteriores (cascade borra block_exercises)
@@ -137,7 +138,22 @@ export async function updateRoutine(id: string, payload: unknown): Promise<{ err
 
 export async function deleteRoutine(id: string) {
   await requireAuth()
-  db.prepare(`DELETE FROM routines WHERE id = ?`).run(id)
+
+  // Pacientes que tienen esta rutina asignada (para revalidar sus vistas)
+  const assigned = db.prepare(`SELECT DISTINCT patient_id FROM assignments WHERE routine_id = ?`).all(id) as { patient_id: string }[]
+
+  const remove = db.transaction(() => {
+    // Desasignar automáticamente: borra las asignaciones (cascadea a session_logs)
+    db.prepare(`DELETE FROM assignments WHERE routine_id = ?`).run(id)
+    // Ahora se puede borrar la rutina (ya no la restringe ninguna asignación)
+    db.prepare(`DELETE FROM routines WHERE id = ?`).run(id)
+  })
+  remove()
+
+  for (const { patient_id } of assigned) {
+    revalidatePath(`/pacientes/${patient_id}`)
+  }
+  revalidatePath('/pacientes')
   revalidatePath('/rutinas')
   redirect('/rutinas')
 }
@@ -145,7 +161,7 @@ export async function deleteRoutine(id: string) {
 export async function duplicateRoutine(id: string) {
   await requireAuth()
 
-  const original = db.prepare(`SELECT * FROM routines WHERE id = ?`).get(id) as { name: string; description: string | null; body_zone: string | null; difficulty: string | null; estimated_minutes: number | null } | null
+  const original = db.prepare(`SELECT * FROM routines WHERE id = ?`).get(id) as { name: string; description: string | null; estimated_minutes: number | null; tags: string | null } | null
   if (!original) return
 
   const newId = randomUUID()
@@ -153,9 +169,9 @@ export async function duplicateRoutine(id: string) {
 
   const dupe = db.transaction(() => {
     db.prepare(`
-      INSERT INTO routines (id, name, description, body_zone, difficulty, estimated_minutes, public_token)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(newId, `${original.name} (copia)`, original.description, original.body_zone, original.difficulty, original.estimated_minutes, newToken)
+      INSERT INTO routines (id, name, description, estimated_minutes, tags, public_token)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(newId, `${original.name} (copia)`, original.description, original.estimated_minutes, original.tags ?? '[]', newToken)
 
     // Copiar días
     const days = db.prepare(`SELECT * FROM routine_days WHERE routine_id = ? ORDER BY order_index`).all(id) as { id: string; name: string; order_index: number }[]
@@ -185,10 +201,16 @@ function copyBlocks(parentId: string, field: 'day_id' | 'routine_id', newRoutine
     db.prepare(`INSERT INTO blocks (id, routine_id, name, order_index, notes, day_id) VALUES (?, ?, ?, ?, ?, ?)`)
       .run(newBlockId, newRoutineId, block.name, block.order_index, block.notes, newDayId)
 
-    const bes = db.prepare(`SELECT * FROM block_exercises WHERE block_id = ? ORDER BY order_index`).all(block.id) as { exercise_id: string; order_index: number; sets: number | null; reps: number | null; duration_seconds: number | null; rest_seconds: number | null; notes: string | null }[]
+    const bes = db.prepare(`SELECT * FROM block_exercises WHERE block_id = ? ORDER BY order_index`).all(block.id) as {
+      exercise_id: string; order_index: number; sets: number | null; reps: number | null
+      duration_seconds: number | null; rest_seconds: number | null
+      intensity_type: string | null; intensity_value: number | null
+      per_side: number; reps_max: number | null
+      notes: string | null
+    }[]
     for (const be of bes) {
-      db.prepare(`INSERT INTO block_exercises (id, block_id, exercise_id, order_index, sets, reps, duration_seconds, rest_seconds, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(randomUUID(), newBlockId, be.exercise_id, be.order_index, be.sets, be.reps, be.duration_seconds, be.rest_seconds, be.notes)
+      db.prepare(`INSERT INTO block_exercises (id, block_id, exercise_id, order_index, sets, reps, duration_seconds, rest_seconds, intensity_type, intensity_value, per_side, reps_max, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(randomUUID(), newBlockId, be.exercise_id, be.order_index, be.sets, be.reps, be.duration_seconds, be.rest_seconds, be.intensity_type, be.intensity_value, be.per_side, be.reps_max, be.notes)
     }
   }
 }

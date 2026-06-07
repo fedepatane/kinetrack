@@ -45,7 +45,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Acciones rápidas */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Link href="/pacientes/nuevo" className="flex items-center gap-2 justify-center rounded-lg border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-medium hover:border-[var(--accent-teal)] hover:text-[var(--accent-teal)] transition-colors">
           <Plus className="size-4" /> Nuevo paciente
         </Link>
@@ -61,7 +61,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Métricas */}
-      <div className="grid grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <Link href="/pacientes" className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4 hover:border-[var(--accent-teal)] transition-colors">
           <div className="flex items-center justify-between mb-2"><span className="text-xs text-[var(--muted-foreground)]">Pacientes</span><Users className="size-3.5 text-[var(--muted-foreground)]" /></div>
           <p className="text-2xl font-medium">{totalPatients}</p>

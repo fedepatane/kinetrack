@@ -5,12 +5,6 @@ import { DuplicateRoutineButton } from './duplicate-button'
 import { DeleteButton } from '@/components/ui/delete-button'
 import { deleteRoutine } from '@/lib/db/actions/routines'
 
-const difficultyColors: Record<string, string> = {
-  suave: 'text-[var(--accent-teal)] bg-[var(--accent-teal-light)]',
-  moderado: 'text-[var(--accent-amber)] bg-[var(--accent-amber-light)]',
-  intenso: 'text-red-600 bg-red-50',
-}
-
 export function RoutineCard({ routine }: { routine: Routine }) {
   return (
     <div className="flex items-center rounded-lg border border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent-teal)] transition-colors group">
@@ -19,16 +13,15 @@ export function RoutineCard({ routine }: { routine: Routine }) {
         className="flex items-center gap-3 flex-1 min-w-0 px-4 py-3"
       >
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
+          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
             <p className="text-sm font-medium text-[var(--foreground)] truncate">{routine.name}</p>
-            {routine.difficulty && (
-              <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${difficultyColors[routine.difficulty]}`}>
-                {routine.difficulty}
+            {routine.tags.map(tag => (
+              <span key={tag} className="text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 bg-[var(--accent-teal)]/15 text-[var(--accent-teal)]">
+                {tag}
               </span>
-            )}
+            ))}
           </div>
           <div className="flex items-center gap-3 text-xs text-[var(--muted-foreground)]">
-            {routine.body_zone && <span>{routine.body_zone}</span>}
             {routine.estimated_minutes && (
               <span className="flex items-center gap-1">
                 <Clock className="size-3" />

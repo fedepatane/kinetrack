@@ -52,6 +52,7 @@ export interface Routine {
   body_zone: string | null
   difficulty: 'suave' | 'moderado' | 'intenso' | null
   estimated_minutes: number | null
+  tags: string[]
   public_token: string | null
   created_at: string
 }
@@ -75,6 +76,8 @@ export interface BlockExercise {
   rest_seconds: number | null
   intensity_type: 'rpe' | 'rir' | '1rm' | null
   intensity_value: number | null
+  per_side: 0 | 1
+  reps_max: number | null
   notes: string | null
 }
 
@@ -83,6 +86,7 @@ export interface Category {
   name: string
   parent_id: string | null
   order_index: number
+  color: string | null
 }
 
 export interface Assignment {

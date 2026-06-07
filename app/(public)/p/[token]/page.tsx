@@ -34,12 +34,6 @@ function getPatientPlan(token: string) {
   return { patient, sessions, assignments }
 }
 
-const difficultyConfig: Record<string, { label: string; color: string; bg: string }> = {
-  suave:    { label: 'suave',    color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  moderado: { label: 'moderado', color: 'text-amber-600',   bg: 'bg-amber-50'   },
-  intenso:  { label: 'intenso',  color: 'text-red-500',     bg: 'bg-red-50'     },
-}
-
 function SectionHeader({ icon: Icon, title, color = 'text-[var(--muted-foreground)]' }: {
   icon: React.ElementType; title: string; color?: string
 }) {
@@ -164,10 +158,6 @@ export default async function PatientPublicPage({ params }: { params: Promise<{ 
                             <Clock className="size-3.5" />{a.routine.estimated_minutes} min
                           </span>
                         )}
-                        {a.routine.difficulty && (() => {
-                          const d = difficultyConfig[a.routine.difficulty!]
-                          return d ? <span className={`${d.color} font-medium`}>{d.label}</span> : null
-                        })()}
                       </div>
                       {a.routine.description && (
                         <p className="text-sm text-[var(--muted-foreground)] mt-1 line-clamp-1">{a.routine.description}</p>
