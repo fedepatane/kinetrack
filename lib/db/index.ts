@@ -171,7 +171,24 @@ function initSchema(conn: Database.Database) {
   for (const row of routinesWithoutToken) updToken.run(randomUUID().replace(/-/g, ''), row.id)
 }
 
+// Conexión perezosa (lazy): NO se crea al importar el módulo, sino en la primera
+// consulta real. Esto es clave para el build: durante `next build` el disco
+// persistente (ej. /var/data en Render) todavía no está montado, así que tocar
+// el filesystem al importar rompía el build. Ahora solo se conecta en runtime.
 const g = global as unknown as { _db?: Database.Database }
-if (!g._db) g._db = createDb()
-else initSchema(g._db)
-export const db = g._db
+
+function getDb(): Database.Database {
+  if (!g._db) g._db = createDb()
+  return g._db
+}
+
+export const db = new Proxy({} as Database.Database, {
+  get(_target, prop) {
+    const conn = getDb()
+    const value = Reflect.get(conn, prop, conn)
+    return typeof value === 'function' ? value.bind(conn) : value
+  },
+  set(_target, prop, value) {
+    return Reflect.set(getDb(), prop, value)
+  },
+})

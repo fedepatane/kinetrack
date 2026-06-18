@@ -4,6 +4,10 @@ import { Sidebar } from '@/components/layout/sidebar'
 import { Topbar } from '@/components/layout/topbar'
 import { getSetting } from '@/lib/db/settings'
 
+// Toda la sección requiere sesión y datos en vivo de la base: render dinámico,
+// nunca estático en build (cuando el disco/DB todavía no está disponible).
+export const dynamic = 'force-dynamic'
+
 export default async function KineLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession()
   if (!session.isLoggedIn) redirect('/login')

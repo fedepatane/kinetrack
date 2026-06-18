@@ -6,6 +6,8 @@ import { Clock } from 'lucide-react'
 import { RoutineDayTabs } from '@/components/patient-view/routine-day-tabs'
 import { CollapsibleBlock } from '@/components/patient-view/routine-blocks'
 
+export const dynamic = 'force-dynamic'
+
 export default async function PublicRoutinePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
 

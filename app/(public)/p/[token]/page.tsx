@@ -4,6 +4,8 @@ import type { Patient, Assignment, Routine, PatientSession } from '@/lib/db/type
 import { ExternalLink, ChevronRight, Clock, Zap, Target, Brain, BarChart2, BookOpen } from 'lucide-react'
 import Link from 'next/link'
 
+export const dynamic = 'force-dynamic'
+
 function getPatientPlan(token: string) {
   const patient = db.prepare(`SELECT * FROM patients WHERE public_token = ?`).get(token) as Patient | null
   if (!patient) return null

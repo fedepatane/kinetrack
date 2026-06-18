@@ -3,8 +3,14 @@ import { db } from '@/lib/db'
 
 // Clave/valor simple para configuración de la app (ej. contraseña personalizada).
 export function getSetting(key: string): string | null {
-  const row = db.prepare(`SELECT value FROM app_settings WHERE key = ?`).get(key) as { value: string } | undefined
-  return row?.value ?? null
+  try {
+    const row = db.prepare(`SELECT value FROM app_settings WHERE key = ?`).get(key) as { value: string } | undefined
+    return row?.value ?? null
+  } catch {
+    // Ej. durante `next build`, cuando el disco/base todavía no está disponible.
+    // El tema es solo una preferencia visual: se cae a los defaults sin romper.
+    return null
+  }
 }
 
 export function setSetting(key: string, value: string) {
