@@ -15,12 +15,13 @@ export function ExerciseDetails({
   description: string | null
 }) {
   const [open, setOpen] = useState(false)
+  const hasDescription = !!description?.trim()
 
   return (
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-1.5">
         <p className="font-medium text-base">{name}</p>
-        {description && (
+        {hasDescription && (
           <button
             type="button"
             onClick={() => setOpen(o => !o)}
@@ -38,7 +39,7 @@ export function ExerciseDetails({
 
       <p className="text-sm text-[var(--accent-teal)] font-medium mt-0.5">{dose}</p>
 
-      {description && open && (
+      {hasDescription && open && (
         <p className="text-sm text-[var(--muted-foreground)] mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-relaxed rounded-md bg-[var(--muted)]/50 p-3 max-w-full">
           {description}
         </p>

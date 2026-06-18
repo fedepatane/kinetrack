@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, useTransition } from 'react'
-import { Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronRight, GripVertical, ArrowUp, ArrowDown } from 'lucide-react'
+import { useState, useEffect, useMemo, useRef, useTransition } from 'react'
+import { Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronRight, ChevronLeft, GripVertical, ArrowUp, ArrowDown, Search } from 'lucide-react'
 import {
   createCategory, renameCategory, deleteCategory, assignCategory, reorderCategories, setCategoryColor
 } from '@/lib/db/actions/categories'
@@ -136,6 +136,98 @@ function ExerciseRow({
           </optgroup>
         ))}
       </select>
+    </div>
+  )
+}
+
+// Normaliza para buscar sin distinguir mayúsculas ni acentos
+function normalize(s: string) {
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
+const PAGE_SIZE = 25
+
+function ExerciseAssigner({
+  exercises,
+  categories,
+}: {
+  exercises: ExerciseWithCategory[]
+  categories: CategoryWithSubs[]
+}) {
+  const [query, setQuery] = useState('')
+  const [page, setPage] = useState(0)
+
+  const filtered = useMemo(() => {
+    const q = normalize(query.trim())
+    if (!q) return exercises
+    return exercises.filter(e => normalize(e.name).includes(q))
+  }, [exercises, query])
+
+  // Volver a la primera página al cambiar la búsqueda
+  useEffect(() => { setPage(0) }, [query])
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const current = Math.min(page, pageCount - 1)
+  const slice = filtered.slice(current * PAGE_SIZE, current * PAGE_SIZE + PAGE_SIZE)
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3 gap-3">
+        <h2 className="text-sm font-medium">Asignar ejercicios</h2>
+        <span className="text-xs text-[var(--muted-foreground)]">
+          {filtered.length} {filtered.length === 1 ? 'ejercicio' : 'ejercicios'}
+        </span>
+      </div>
+
+      <div className="relative mb-3">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[var(--muted-foreground)] pointer-events-none" />
+        <input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Buscar ejercicio..."
+          className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] pl-9 pr-9 py-2 text-sm focus:outline-none focus:border-[var(--accent-teal)]"
+        />
+        {query && (
+          <button
+            type="button"
+            onClick={() => setQuery('')}
+            aria-label="Limpiar búsqueda"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+          >
+            <X className="size-4" />
+          </button>
+        )}
+      </div>
+
+      <div className="rounded-lg border border-[var(--border)] divide-y divide-[var(--border)] bg-[var(--card)]">
+        {slice.length === 0 ? (
+          <p className="text-sm text-[var(--muted-foreground)] p-4 text-center italic">Sin resultados.</p>
+        ) : (
+          slice.map(ex => <ExerciseRow key={ex.id} exercise={ex} categories={categories} />)
+        )}
+      </div>
+
+      {pageCount > 1 && (
+        <div className="flex items-center justify-between mt-3">
+          <button
+            type="button"
+            onClick={() => setPage(p => Math.max(0, p - 1))}
+            disabled={current === 0}
+            className="inline-flex items-center gap-1 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] disabled:opacity-30 disabled:pointer-events-none"
+          >
+            <ChevronLeft className="size-4" /> Anterior
+          </button>
+          <span className="text-xs text-[var(--muted-foreground)]">Página {current + 1} de {pageCount}</span>
+          <button
+            type="button"
+            onClick={() => setPage(p => Math.min(pageCount - 1, p + 1))}
+            disabled={current >= pageCount - 1}
+            className="inline-flex items-center gap-1 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] disabled:opacity-30 disabled:pointer-events-none"
+          >
+            Siguiente <ChevronRight className="size-4" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -377,14 +469,7 @@ export function CategoryManager({
 
       {/* Asignar ejercicios */}
       {exercises.length > 0 && (
-        <div>
-          <h2 className="text-sm font-medium mb-3">Asignar ejercicios</h2>
-          <div className="rounded-lg border border-[var(--border)] divide-y divide-[var(--border)] bg-[var(--card)]">
-            {exercises.map(ex => (
-              <ExerciseRow key={ex.id} exercise={ex} categories={categories} />
-            ))}
-          </div>
-        </div>
+        <ExerciseAssigner exercises={exercises} categories={categories} />
       )}
     </div>
   )

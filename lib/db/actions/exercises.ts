@@ -139,6 +139,12 @@ export async function updateExercise(id: string, formData: FormData) {
 
 export async function deleteExercise(id: string) {
   await requireAuth()
-  db.prepare(`DELETE FROM exercises WHERE id = ?`).run(id)
+  // El ejercicio puede estar usado en bloques de rutinas (FK RESTRICT).
+  // Lo sacamos de esos bloques y después lo borramos, todo en una transacción.
+  db.transaction(() => {
+    db.prepare(`DELETE FROM block_exercises WHERE exercise_id = ?`).run(id)
+    db.prepare(`DELETE FROM exercises WHERE id = ?`).run(id)
+  })()
   revalidatePath('/ejercicios')
+  revalidatePath('/rutinas')
 }

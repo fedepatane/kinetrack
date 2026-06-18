@@ -1,42 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import type { DayWithBlocks, BlockExerciseWithExercise } from '@/lib/db/queries/routines'
-import { MediaLauncher } from './media-launcher'
-import { ExerciseDetails } from './exercise-details'
-import { formatDose, resolveMedia } from '@/lib/utils'
-import Image from 'next/image'
-
-function ExerciseRow({ be }: { be: BlockExerciseWithExercise }) {
-  const ex = be.exercise
-  if (!ex) return null
-  const media = resolveMedia(ex.video_url, ex.thumbnail_url)
-  const thumb = media?.thumb ?? null
-  const color = ex.category_color
-
-  return (
-    <div className="flex items-center gap-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-4 hover:border-[var(--accent-teal)] transition-colors"
-      style={color ? { borderLeftColor: color, borderLeftWidth: 5 } : undefined}>
-      <div className="w-28 h-16 rounded-xl bg-[var(--muted)] flex-shrink-0 overflow-hidden relative">
-        {media ? (
-          <MediaLauncher media={media} title={ex.name}>
-            <button className="absolute inset-0 w-full h-full cursor-pointer">
-              {thumb && <Image src={thumb} alt={ex.name} width={112} height={64} className="object-cover w-full h-full" />}
-              <div className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/25 transition-colors">
-                <span className="text-white/80 text-lg drop-shadow">{media.mode === 'image' ? '⤢' : '▶'}</span>
-              </div>
-            </button>
-          </MediaLauncher>
-        ) : thumb ? (
-          <Image src={thumb} alt={ex.name} width={112} height={64} className="object-cover w-full h-full" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-[var(--muted-foreground)] text-xs">Sin video</div>
-        )}
-      </div>
-      <ExerciseDetails name={ex.name} dose={formatDose(be)} description={ex.description} />
-    </div>
-  )
-}
+import type { DayWithBlocks } from '@/lib/db/queries/routines'
+import { CollapsibleBlock } from './routine-blocks'
 
 export function RoutineDayTabs({ days }: { days: DayWithBlocks[] }) {
   const [active, setActive] = useState(0)
@@ -62,19 +28,9 @@ export function RoutineDayTabs({ days }: { days: DayWithBlocks[] }) {
       </div>
 
       {/* Contenido del día activo */}
-      <div className="space-y-8">
+      <div className="space-y-3">
         {day.blocks.map(block => (
-          <div key={block.id}>
-            <p className="text-sm font-medium text-[var(--muted-foreground)] mb-3">{block.name}</p>
-            {block.notes && (
-              <p className="text-sm text-[var(--muted-foreground)] mb-3 italic">{block.notes}</p>
-            )}
-            <div className="space-y-2.5">
-              {block.block_exercises
-                .sort((a, b) => a.order_index - b.order_index)
-                .map(be => <ExerciseRow key={be.id} be={be} />)}
-            </div>
-          </div>
+          <CollapsibleBlock key={block.id} block={block} />
         ))}
       </div>
     </div>

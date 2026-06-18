@@ -2,13 +2,9 @@ import { notFound } from 'next/navigation'
 import { getRoutineWithBlocks } from '@/lib/db/queries/routines'
 import { db } from '@/lib/db'
 import type { Routine } from '@/lib/db/types'
-import { Clock, ChevronLeft } from 'lucide-react'
+import { Clock } from 'lucide-react'
 import { RoutineDayTabs } from '@/components/patient-view/routine-day-tabs'
-import { MediaLauncher } from '@/components/patient-view/media-launcher'
-import { ExerciseDetails } from '@/components/patient-view/exercise-details'
-import { formatDose, resolveMedia } from '@/lib/utils'
-import Image from 'next/image'
-import Link from 'next/link'
+import { CollapsibleBlock } from '@/components/patient-view/routine-blocks'
 
 export default async function PublicRoutinePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -61,48 +57,9 @@ export default async function PublicRoutinePage({ params }: { params: Promise<{ 
         {hasDays ? (
           <RoutineDayTabs days={routine.days} />
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-3">
             {routine.blocks.map(block => (
-              <div key={block.id}>
-                <h2 className="text-sm font-medium text-[var(--muted-foreground)] uppercase tracking-wider mb-4">
-                  {block.name}
-                </h2>
-                {block.notes && (
-                  <p className="text-sm text-[var(--muted-foreground)] mb-3 italic">{block.notes}</p>
-                )}
-                <div className="space-y-3">
-                  {[...block.block_exercises]
-                    .sort((a, b) => a.order_index - b.order_index)
-                    .map(be => {
-                      const ex = be.exercise
-                      const media = resolveMedia(ex?.video_url, ex?.thumbnail_url)
-                      const thumb = media?.thumb ?? null
-                      const color = ex?.category_color
-                      return (
-                        <div key={be.id} className="flex items-center gap-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-4 hover:border-[var(--accent-teal)] transition-colors"
-                          style={color ? { borderLeftColor: color, borderLeftWidth: 5 } : undefined}>
-                          <div className="w-28 h-16 rounded-xl bg-[var(--muted)] flex-shrink-0 overflow-hidden relative">
-                            {media ? (
-                              <MediaLauncher media={media} title={ex?.name ?? ''}>
-                                <button className="absolute inset-0 w-full h-full cursor-pointer">
-                                  {thumb && <Image src={thumb} alt={ex?.name ?? ''} width={112} height={64} className="object-cover w-full h-full" />}
-                                  <div className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/25 transition-colors">
-                                    <span className="text-white/80 text-lg drop-shadow">{media.mode === 'image' ? '⤢' : '▶'}</span>
-                                  </div>
-                                </button>
-                              </MediaLauncher>
-                            ) : thumb ? (
-                              <Image src={thumb} alt={ex?.name ?? ''} width={112} height={64} className="object-cover w-full h-full" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-[var(--muted-foreground)] text-xs">Sin video</div>
-                            )}
-                          </div>
-                          <ExerciseDetails name={ex?.name ?? '—'} dose={formatDose(be)} description={ex?.description ?? null} />
-                        </div>
-                      )
-                    })}
-                </div>
-              </div>
+              <CollapsibleBlock key={block.id} block={block} />
             ))}
           </div>
         )}
